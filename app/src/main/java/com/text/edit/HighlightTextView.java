@@ -639,6 +639,7 @@ public class HighlightTextView extends View {
         smoothScrollBy(dx, dy);
     }
 
+
     // Insert text
     private void insert(CharSequence c, UndoStack.Action action) {
         // nothing to do
