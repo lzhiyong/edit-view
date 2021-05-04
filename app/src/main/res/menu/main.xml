@@ -3,37 +3,42 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <item
-        android:id="@+id/action_undo"
+        android:id="@+id/menu_undo"
         android:orderInCategory="100"
         android:title="undo"
-        android:icon="@drawable/ic_undo_selector"
         app:showAsAction="always" />
 
     <item
-        android:id="@+id/action_redo"
+        android:id="@+id/menu_redo"
         android:orderInCategory="200"
         android:title="redo"
-        android:icon="@drawable/ic_redo_selector"
         app:showAsAction="always" />
-
-
+    
     <item
-        android:id="@+id/action_open"
+        android:id="@+id/menu_edit"
         android:orderInCategory="300"
-        android:title="@string/action_open"
-        android:showAsAction="never" />
-
+        android:title="edit"
+        app:showAsAction="always" />
     <item
-        android:id="@+id/action_gotoline"
+        android:id="@+id/menu_open"
         android:orderInCategory="400"
-        android:title="@string/action_gotoline"
-        android:showAsAction="never" />
+        android:title="@string/menu_open"
+        app:showAsAction="never" />
 
     <item
-        android:id="@+id/action_settings"
+        android:id="@+id/menu_gotoline"
         android:orderInCategory="500"
-        android:title="@string/action_settings"
-        android:showAsAction="never" />
-
-
+        android:title="@string/menu_gotoline"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_settings"
+        android:orderInCategory="600"
+        android:title="@string/menu_settings"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_save"
+        android:orderInCategory="700"
+        android:title="@string/menu_save"
+        app:showAsAction="never" />
 </menu>
+

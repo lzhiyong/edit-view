@@ -2,32 +2,37 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 28
-    buildToolsVersion "28.0.3"
+    buildToolsVersion "29.0.3"
 
     defaultConfig {
-        applicationId "com.app.ui"
-        minSdkVersion 19
+        applicationId "com.text.edit"
+        minSdkVersion 21
         targetSdkVersion 28
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.0"
     }
+    
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    lintOptions {
-        checkReleaseBuilds false
-        abortOnError false
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
+    
+    lintOptions {
+       quiet true
+       checkReleaseBuilds false
+       abortOnError false
+   }
 }
 
 dependencies {
-   	implementation 'androidx.appcompat:appcompat:1.0.0'
-   	implementation 'androidx.legacy:legacy-support-v4:1.0.0'
-   	implementation 'com.google.android.material:material:1.0.0-rc01'
-    implementation 'androidx.cardview:cardview:1.0.0'
-    
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+	implementation 'com.google.android.material:material:1.3.0'
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
