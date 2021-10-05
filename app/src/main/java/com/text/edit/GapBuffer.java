@@ -460,15 +460,7 @@ public class GapBuffer implements CharSequence {
         _contents = temp;
     }
 
-    /**
-     * Returns the total number of characters in the text, including the
-     * EOF sentinel char
-     */
-//    private synchronized int getTextLength() {
-//        return _contents.length - gapSize();
-//    }
-
-    private synchronized boolean isValid(int charOffset) {
+    private boolean isValid(int charOffset) {
         return (charOffset >= 0 && charOffset <= this.length());
     }
 
