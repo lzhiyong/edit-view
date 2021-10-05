@@ -24,6 +24,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import com.text.edit.R;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -38,7 +39,6 @@ import org.mozilla.universalchardet.UniversalDetector;
 
 public class MainActivity extends AppCompatActivity {
 
-    private TextBuffer mTextBuffer;
     private HighlightTextView mTextView;
 
     private ProgressBar mIndeterminateBar;
@@ -47,10 +47,6 @@ public class MainActivity extends AppCompatActivity {
     private Charset mDefaultCharset = StandardCharsets.UTF_8;
     private String externalPath = File.separator;
 
-    private final int REFRESH_OPTION_MENU = 1;
-    private final int IS_READ_FILE = 2;
-    private final int IS_WRITE_FILE = 3;
-
     private final String TAG = this.getClass().getSimpleName();
 
     private Handler mHandler = new Handler() {
@@ -58,11 +54,7 @@ public class MainActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             // TODO: Implement this method
             super.handleMessage(msg);
-            switch(msg.what) {
-            case REFRESH_OPTION_MENU:
-                invalidateOptionsMenu();
-                break;
-            }
+            invalidateOptionsMenu();
         }
     };
 
@@ -70,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onTextChanged() {
             // TODO: Implement this method
-            mHandler.sendEmptyMessage(REFRESH_OPTION_MENU);
+            mHandler.sendEmptyMessage(0);
             mTextView.postInvalidate();
         }
     };
@@ -92,7 +84,6 @@ public class MainActivity extends AppCompatActivity {
         mTextView.setOnTextChangedListener(textListener);
 
         mSharedPreference = PreferenceManager.getDefaultSharedPreferences(this);
-        //mTextView.setText("Hello");
 
         String permission = Manifest.permission.WRITE_EXTERNAL_STORAGE;
 
@@ -103,8 +94,6 @@ public class MainActivity extends AppCompatActivity {
         if(Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
             externalPath = Environment.getExternalStorageDirectory().getAbsolutePath();
         }
-        mTextBuffer = new TextBuffer();
-        mTextView.setTextBuffer(mTextBuffer);
 
         ActivityManager mActivityManager =  (ActivityManager)getSystemService(Context.ACTIVITY_SERVICE);
         int maxHeapSize = mActivityManager.getLargeMemoryClass();
@@ -131,9 +120,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void toggleEditMode() {
-        if(!mTextBuffer.onReadFinish) return;
         mTextView.setEditedMode(!mTextView.getEditedMode());
-        mHandler.sendEmptyMessage(REFRESH_OPTION_MENU);
+        mHandler.sendEmptyMessage(0);
     }
 
     @Override
@@ -187,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
             toggleEditMode();
             break;
         case R.id.menu_open:
-            showOperateFileDialog("open file", IS_READ_FILE);
+            showOpenFileDialog();
             break;
         case R.id.menu_gotoline:
             showGotoLineDialog();
@@ -203,78 +191,45 @@ public class MainActivity extends AppCompatActivity {
     private void showGotoLineDialog() {
         final View v = getLayoutInflater().inflate(R.layout.dialog_gotoline, null);
         final EditText lineEdit = v.findViewById(R.id.lineEdit);
-        final TextBuffer buffer = mTextView.getTextBuffer();
-        if(buffer != null)
-            lineEdit.setHint("1.." + buffer.getLineCount());
-        else
-            lineEdit.setHint("0");
+        lineEdit.setHint("1.." + mTextView.getLineCount());
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setView(v);
         builder.setTitle("goto line");
 
-        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener(){
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    if(buffer == null) return;
-                    String line = lineEdit.getText().toString();
-                    if(line != null && !line.isEmpty()) {
-                        mTextView.gotoLine(Integer.parseInt(line));
-                    }
-                }
-            });
+        builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {
+            String line = lineEdit.getText().toString();
+            if(!line.isEmpty()) {
+                mTextView.gotoLine(Integer.parseInt(line));
+            }
+        });
 
-        builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
-                }
-            });
+        builder.setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss());
         builder.setCancelable(true).show();
     }
 
-    // open and save the file
-    private void showOperateFileDialog(String title, final int option) {
+    
+    private void showOpenFileDialog() {
         View v = getLayoutInflater().inflate(R.layout.dialog_openfile, null);
         final EditText pathEdit = v.findViewById(R.id.pathEdit);
-
-        final String path = mSharedPreference.getString("filepath", null);
-        if(option == IS_READ_FILE) {
-            if(path != null && !path.isEmpty()) pathEdit.setText(path);
-        }
-        pathEdit.setHint("please enter the file path");
-
+        String path = mSharedPreference.getString("path", "");
+        if(path.isEmpty())
+            pathEdit.setHint("please enter the file path");
+        else
+            pathEdit.setText(path);
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setView(v);
-        builder.setTitle(title);
+        builder.setTitle("open file");
 
-        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener(){
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    String pathname = pathEdit.getText().toString();
-                    if(pathname != null && !pathname.isEmpty()) {                
-                        if(option == IS_READ_FILE) {
-                            mSharedPreference.edit().putString("filepath", pathname).commit();
-                            if(FileUtils.checkOpenFileState(Paths.get(pathname)) 
-                               && !FileUtils.checkSameFile(Paths.get(pathname))) {
-                                FileUtils.removeOpenedFile(path);
-                                // add an opened file
-                                FileUtils.addOpenedFile(pathname);
-                                new ReadFileThread().execute(pathname);
-                            }
-                        } else if(option == IS_WRITE_FILE) {
-                            new WriteFileThread().execute(pathname);
-                        }
-                    }
-                }
-            });
+        builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {
+            String pathname = pathEdit.getText().toString();
+            if(!pathname.isEmpty()) {
+                mSharedPreference.edit().putString("path", pathname).commit();
+                new ReadFileThread().execute(pathname);
+            }
+        });
 
-        builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    dialog.dismiss();
-                }
-            });
+        builder.setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss());
         builder.setCancelable(true).show();
     }
 
@@ -287,7 +242,7 @@ public class MainActivity extends AppCompatActivity {
             // TODO: Implement this method
             super.onPreExecute();
             mTextView.setEditedMode(false);
-            mHandler.sendEmptyMessage(REFRESH_OPTION_MENU);
+            mHandler.sendEmptyMessage(0);
             mIndeterminateBar.setVisibility(View.VISIBLE);
         }
 
@@ -295,48 +250,16 @@ public class MainActivity extends AppCompatActivity {
         protected Boolean doInBackground(String...params) {
             // TODO: Implement this method
             Path path = Paths.get(params[0]);
-            
-            StringBuilder strBuilder = mTextBuffer.getBuffer();
-            ArrayList<Integer> indexList = mTextBuffer.getIndexList();
-            ArrayList<Integer> widthList = mTextBuffer.getWidthList();
-
             try {
                 // detect the file charset
                 String charset = UniversalDetector.detectCharset(path.toFile());
-                if(charset != null) mDefaultCharset = Charset.forName(charset);
-
+                if(charset != null) 
+                    mDefaultCharset = Charset.forName(charset);
                 // create buffered reader
                 BufferedReader br = Files.newBufferedReader(path, mDefaultCharset);
-
                 String text = null;
-                // read file
                 while((text = br.readLine()) != null) {
-                    strBuilder.append(text).append(System.lineSeparator());
-
-                    if(indexList.size() == 0) {
-                        // add first index 0
-                        indexList.add(0);
-                    }
-                    indexList.add(strBuilder.length());
-
-                    // text line width
-                    int width = mTextView.getTextMeasureWidth(text);
-                    if(width > mTextBuffer.lineWidth) {
-                        mTextBuffer.lineWidth = width;
-                        mTextBuffer.lineIndex = mTextBuffer.lineCount;
-                    }
-                    widthList.add(width);
-                    // line count
-                    ++mTextBuffer.lineCount;
-                }
-
-                if(indexList.size() > 0) {
-                    // remove the last index of '\n'
-                    indexList.remove(indexList.size() - 1);
-                } else {
-                    // the file is empty
-                    // set a default empty string
-                    mTextBuffer.setBuffer("", mTextView);
+                    mTextView.getBuffer().append(text).append("\n");
                 }
                 // close the stream
                 br.close();
@@ -345,7 +268,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, e.getMessage());
             }
 
-            return mTextBuffer.onReadFinish = true;
+            return true;
         }
 
         @Override
@@ -353,7 +276,7 @@ public class MainActivity extends AppCompatActivity {
             // TODO: Implement this method
             super.onPostExecute(result);
             mTextView.setEditedMode(true);
-            mHandler.sendEmptyMessage(REFRESH_OPTION_MENU);
+            mHandler.sendEmptyMessage(0);
             mIndeterminateBar.setVisibility(View.GONE);
         }
     }
@@ -365,14 +288,12 @@ public class MainActivity extends AppCompatActivity {
         protected Boolean doInBackground(String...params) {
             // TODO: Implement this method
             Path path = Paths.get(params[0]);
-            if(!FileUtils.checkSaveFileState(path)) 
-                return false;
-
+            
             try {
                 BufferedWriter bufferWrite = null;
                 bufferWrite = Files.newBufferedWriter(path, mDefaultCharset, 
                                                       StandardOpenOption.WRITE);
-                bufferWrite.write(mTextView.getTextBuffer().getBuffer().toString());     
+                bufferWrite.write(mTextView.getBuffer().toString());     
                 bufferWrite.flush();
                 bufferWrite.close();
             } catch(Exception e) {
@@ -385,7 +306,6 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(Boolean result) {
             // TODO: Implement this method
             super.onPostExecute(result);
-            mTextView.getTextBuffer().onWriteFinish = true;
             Toast.makeText(getApplicationContext(), "saved success!", Toast.LENGTH_SHORT).show();
         }
     }

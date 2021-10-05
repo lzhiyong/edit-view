@@ -8,36 +8,32 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
-import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.text.InputType;
 import android.text.TextPaint;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.Pair;
 import android.view.GestureDetector;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
+import android.view.animation.AnimationUtils;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.OverScroller;
-import android.widget.Scroller;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import android.view.animation.AnimationUtils;
 
 
 public class HighlightTextView extends View {
 
-    private static Paint mPaint;
-    private static TextPaint mTextPaint;
+    private Paint mPaint;
+    private TextPaint mTextPaint;
 
     // cursor and select handle drawable resources
     private Drawable mDrawableCursorRes;
@@ -58,7 +54,7 @@ public class HighlightTextView extends View {
     private int selectHandleLeftX, selectHandleLeftY;
     private int selectHandleRightX, selectHandleRightY;
 
-    private TextBuffer mTextBuffer;
+    private GapBuffer mGapBuffer;
     private UndoStack mUndoStack;
 
     private OnTextChangedListener mTextListener;
@@ -152,6 +148,7 @@ public class HighlightTextView extends View {
         mDefaultText = getResources().getString(R.string.default_text);
         spaceWidth = (int) mTextPaint.measureText(String.valueOf(' '));
 
+        mGapBuffer = new GapBuffer();
         setDefaultCursorPosition();
 
         requestFocus();
@@ -174,30 +171,26 @@ public class HighlightTextView extends View {
         }
     };
 
-    public void setTextBuffer(TextBuffer textBuffer) {
-        mTextBuffer = textBuffer;
-        setDefaultCursorPosition();
+    public void setBuffer(GapBuffer buffer) {
+        mGapBuffer = buffer;
+        invalidate();
+    }
+    
+    public GapBuffer getBuffer() {
+        return this.mGapBuffer;
     }
 
-    public void setText(CharSequence c) {
-        mTextBuffer = new TextBuffer(c, this);
-        setDefaultCursorPosition();
-    }
-
-    public TextBuffer getTextBuffer() {
-        return mTextBuffer;
+    public void setText(String text) {
+        mGapBuffer = new GapBuffer(text);
+        invalidate();
     }
 
     public void setDefaultCursorPosition() {
-        int lineNumberWidth = 0;
-        if(mTextBuffer != null)
-            lineNumberWidth = getLineNumberWidth();
-        else
-            lineNumberWidth = getCharWidth('0');
-        mCursorPosX = getPaddingLeft() + lineNumberWidth + SPACEING;
         mCursorPosY = 0;
+        mCursorPosX = getLeftSpace();
+        
         mCursorIndex = 0;
-        mCursorLine = mCursorPosY / getLineHeight() + 1;
+        mCursorLine = getLineCount();
     }
 
     // the text size unit is px
@@ -215,13 +208,13 @@ public class HighlightTextView extends View {
         TextPaint.FontMetricsInt metrics = mTextPaint.getFontMetricsInt();
         lineHeight = metrics.bottom - metrics.top;
 
-        if(mTextBuffer != null) {
+        if(mGapBuffer != null) {
             // max width line index
-            //int line = mTextBuffer.getWidthList().indexOf(getTextWidth());
-            //mTextBuffer.getWidthList().set(line, getLineWidth(line + 1));
-            adjustCursorPosition(mCursorIndex, mCursorLine);
+            //int line = mGapBuffer.getWidthList().indexOf(getTextWidth());
+            //mGapBuffer.getWidthList().set(line, getLineWidth(line + 1));
+            adjustCursorPosition();
             if(isSelectMode)
-                adjustSelectHandle(selectionStart, selectionEnd);
+                adjustSelectRange(selectionStart, selectionEnd);
             postInvalidate();
         }
     }
@@ -258,41 +251,40 @@ public class HighlightTextView extends View {
         return getHeight() / getLineHeight() + 1;
     }
 
-    public static int getTextMeasureWidth(String text) {
-        return (int) mTextPaint.measureText(text);
+    public int measureText(String text) {
+        return (int) Math.ceil(mTextPaint.measureText(text));
     }
-
+    
+    private int charWidth(char c) {
+        return measureText(String.valueOf(c));
+    }
+    
     private int getLineHeight() {
         return lineHeight;
     }
 
-    private int getLineCount() {
-        return mTextBuffer.getLineCount();
+    private int getLineStart(int lineNumber) {
+        return mGapBuffer.getLineOffset(lineNumber);
     }
-
-    private int getCharWidth(char c) {
-        return getTextMeasureWidth(String.valueOf(c));
+    
+    private int getOffsetLine(int offset) {
+        return mGapBuffer.findLineNumber(offset);
+    }
+    
+    public int getLineCount() {
+        return mGapBuffer.getLineCount();
     }
 
     private int getCharWidth(int index) {
-        return getCharWidth(mTextBuffer.getCharAt(index));
+        return charWidth(mGapBuffer.charAt(index));
     }
 
     private int getLineNumberWidth() {
-        return String.valueOf(getLineCount()).length() * getCharWidth('0');
-    }
-
-    private int getLineStart(int line) {
-        return mTextBuffer.getLineStart(line);
+        return measureText(Integer.toString(getLineCount()));
     }
 
     private int getLineWidth(int line) {
-        return getTextMeasureWidth(mTextBuffer.getLine(line));
-    }
-
-    // get the max width of text
-    private int getTextWidth() {
-        return mTextBuffer.getMaxWidth();
+        return measureText(mGapBuffer.getLine(line));
     }
 
     // get the max height of text
@@ -302,7 +294,7 @@ public class HighlightTextView extends View {
 
     // Get the maximum scrollable width
     public int getMaxScrollX() {
-        return Math.max(0, getLeftSpace() + getTextWidth() + spaceWidth * 4 - getWidth());
+        return Math.max(0, getLeftSpace() + /*getTextWidth()*/10000 + spaceWidth * 4 - getWidth());
     }
 
     // Get the maximum scrollable height
@@ -450,12 +442,12 @@ public class HighlightTextView extends View {
                 else
                     mPaint.setColor(Color.CYAN);
 
-                int line = mTextBuffer.getOffsetLine(start);
+                int line = mGapBuffer.findLineNumber(start);
                 int lineStart = getLineStart(line);
 
-                canvas.drawRect(left + getTextMeasureWidth(mTextBuffer.getText(lineStart, start)),
+                canvas.drawRect(left + measureText(mGapBuffer.substring(lineStart, start)),
                                 (line - 1) * getLineHeight(),
-                                left + getTextMeasureWidth(mTextBuffer.getText(lineStart, end)),
+                                left + measureText(mGapBuffer.substring(lineStart, end)),
                                 line * getLineHeight(),
                                 mPaint
                                 );
@@ -523,7 +515,7 @@ public class HighlightTextView extends View {
             textX += (lineNumWidth + SPACEING);
             mTextPaint.setColor(Color.BLACK);
 
-            canvas.drawText(mTextBuffer.getLine(i), textX, textY, mTextPaint);
+            canvas.drawText(mGapBuffer.getLine(i), textX, textY, mTextPaint);
         }
     }
 
@@ -531,15 +523,6 @@ public class HighlightTextView extends View {
     protected void onDraw(Canvas canvas) {
         // TODO: Implement this method
         super.onDraw(canvas);
-        if(mTextBuffer == null || mTextBuffer.getLength() == 0) {
-            canvas.drawText(mDefaultText, 
-                            getWidth() / 2 - getTextMeasureWidth(mDefaultText) / 2, 
-                            getHeight() / 2 - getLineHeight(), 
-                            mTextPaint
-                            );
-            return; // no text content, return directly 
-        } 
-
         canvas.save();
 
         // translate clipping region to create padding around edges
@@ -573,11 +556,6 @@ public class HighlightTextView extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         // TODO: Implement this method
-        if(mTextBuffer == null || mTextBuffer.getLength() == 0) {
-            // no text content, return false directly 
-            return false;
-        }
-
         switch(event.getAction()) {
         case MotionEvent.ACTION_DOWN:
             mScroller.abortAnimation();
@@ -590,8 +568,7 @@ public class HighlightTextView extends View {
         // gesture detector
         mGestureDetector.onTouchEvent(event);
         // scale gesture detector
-        if(event.getPointerCount() == 2)
-            mScaleGestureDetector.onTouchEvent(event);
+        mScaleGestureDetector.onTouchEvent(event);
         return true;
     }
 
@@ -602,11 +579,11 @@ public class HighlightTextView extends View {
         if(event.getAction() == KeyEvent.ACTION_DOWN) {
             switch(keyCode) {
             case KeyEvent.KEYCODE_ENTER:
-                insert("\n", new UndoStack.Action());
+                insert("\n");
                 break;
             case KeyEvent.KEYCODE_DEL:
                 // delete char at cursor index
-                delete(mCursorIndex - 1, mCursorIndex, new UndoStack.Action());
+                delete();
                 break;
             }
         }
@@ -641,43 +618,20 @@ public class HighlightTextView extends View {
 
 
     // Insert text
-    private void insert(CharSequence c, UndoStack.Action action) {
-        // nothing to do
-        if(!isEditedMode) return;
-
+    private void insert(String text) {
+        if(!isEditedMode) return; // nothing to do
+        
         removeCallbacks(blinkAction);
         mCursorVisiable = true;
         mHandleMiddleVisable = false;
+        
+        mGapBuffer.insert(mCursorIndex, text);
 
-        int length = c.length();
-        String insertText = c.toString();
-        String deleteText = null;
-
-        if(isSelectMode) {
-            // no need to add action
-            deleteText = mTextBuffer.getText(selectionStart, selectionEnd);
-            if(action != null) {
-                action.deleteStart = selectionStart;
-                action.deleteEnd = selectionEnd;
-                action.deleteText = deleteText;
-            }
-        }
-
-        // real insert
-        mTextBuffer.insert(mCursorIndex, c, mCursorLine, this);
-
-        // add undo stack action
-        if(action != null) {
-            action.insertStart = mCursorIndex;
-            action.insertEnd = mCursorIndex + length;
-            action.insertText = insertText;
-            mUndoStack.add(action);
-        }
-
-        // recalculate cursor index and line
+        // calculate the cursor index and line
+        int length = text.length();
         mCursorIndex += length;
-        mCursorLine = mTextBuffer.getOffsetLine(mCursorIndex);
-        adjustCursorPosition(mCursorIndex, mCursorLine);
+        mCursorLine = getOffsetLine(mCursorIndex);
+        adjustCursorPosition();
         mTextListener.onTextChanged();
 
         scrollToVisable();
@@ -686,45 +640,26 @@ public class HighlightTextView extends View {
     }
 
     // Delete text
-    private void delete(int start, int end, UndoStack.Action action) {
-        // nothing to do
-        if(!isEditedMode) return;
+    private void delete() {
+        if(!isEditedMode) return; // nothing to do
 
         removeCallbacks(blinkAction);
         mCursorVisiable = true;
         mHandleMiddleVisable = false;
-
+        
+        int len = 1; // default delete 1 char
         if(isSelectMode) {
-            start = selectionStart;
-            end = selectionEnd;
-            isSelectMode = false;
+            len = selectionEnd - selectionStart;
+            mGapBuffer.delete(selectionStart, len);
+        } else {
+            mGapBuffer.delete(mCursorIndex - 1, len);
         }
-
-        // cursor at index 0
-        if(start < 0) {
-            mCursorIndex = 0;
-            postDelayed(blinkAction, BLINK_TIMEOUT);
-            return; // nothing to do
-        } else if(start == end && end > 0) {
-            start = end - 1;
-        }
-
-        String deleteText = mTextBuffer.getText(start, end);
-        // real delete
-        mTextBuffer.delete(start, end, mCursorLine, this);
-
-        // add undo stack action
-        if(action != null && deleteText != null) {
-            action.deleteStart = start;
-            action.deleteEnd = end;
-            action.deleteText = deleteText;
-            mUndoStack.add(action);
-        }
-
+        
         // calculate cursor index and line
-        mCursorIndex -= (end - start);
-        mCursorLine = mTextBuffer.getOffsetLine(mCursorIndex);
-        adjustCursorPosition(mCursorIndex, mCursorLine);
+        mCursorIndex -= len;
+        mCursorLine = getOffsetLine(mCursorIndex);
+        
+        adjustCursorPosition();
         mTextListener.onTextChanged();
 
         scrollToVisable();
@@ -744,22 +679,19 @@ public class HighlightTextView extends View {
     // cut text
     public void cut() {
         copy();
-        delete(selectionStart, selectionEnd, new UndoStack.Action());
+        delete();
         isSelectMode = false;
     }
 
     // paste text
     public void paste() {
         if(mClipboard.hasPrimaryClip()) {
-
             ClipDescription description = mClipboard.getPrimaryClipDescription();
-
             if(description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
                 ClipData data = mClipboard.getPrimaryClip();
                 ClipData.Item item = data.getItemAt(0);
                 String text = item.getText().toString();
-
-                insert(text, new UndoStack.Action());
+                insert(text);
             }
         }
     }
@@ -769,7 +701,7 @@ public class HighlightTextView extends View {
         int second = (Integer)mReplaceList.get(curr).second; 
 
         setCursorPosition(second);
-        adjustSelectHandle(first, second);
+        adjustSelectRange(first, second);
 
         //mHorizontalScrollView.smoothScrollTo(selectHandleLeftX, mScrollY);
         //mScrollView.smoothScrollTo(mScrollX, selectHandleLeftY);
@@ -819,7 +751,7 @@ public class HighlightTextView extends View {
         if(!mReplaceList.isEmpty())
             mReplaceList.clear();
 
-        Matcher matcher = Pattern.compile(regex).matcher(mTextBuffer.getBuffer());
+        Matcher matcher = Pattern.compile(regex).matcher(mGapBuffer.toString());
 
         while(matcher.find()) {
             mReplaceList.add(new Pair<Integer, Integer>(matcher.start(), matcher.end()));
@@ -834,10 +766,10 @@ public class HighlightTextView extends View {
 
             int length = replacement.length();
             setCursorPosition(start + length);
-            adjustSelectHandle(start + length, start + length);
+            adjustSelectRange(start + length, start + length);
 
             int delta = start + length - end;
-            mTextBuffer.replace(start, end, replacement, mCursorLine, delta, this);
+            //mGapBuffer.replace(start, end, replacement, mCursorLine, delta, this);
 
             // remove the first item
             mReplaceList.remove(0);
@@ -873,7 +805,7 @@ public class HighlightTextView extends View {
         // at first index
         selectionStart = 0;
         // at last index
-        selectionEnd = mTextBuffer.getLength() - 1;
+        selectionEnd = mGapBuffer.length();
 
         // set handle left at first position
         selectHandleLeftX = getLeftSpace();
@@ -894,7 +826,7 @@ public class HighlightTextView extends View {
 
     public String getSelectText() {
         if(isSelectMode)
-            return mTextBuffer.getText(selectionStart, selectionEnd);
+            return mGapBuffer.substring(selectionStart, selectionEnd);
         return null;
     }
 
@@ -904,7 +836,7 @@ public class HighlightTextView extends View {
 
         if(line > getLineCount()) 
             line = getLineCount();
-
+            
         mCursorIndex = getLineStart(line);
         mCursorLine = line;
         mCursorPosX = getLeftSpace();
@@ -914,50 +846,32 @@ public class HighlightTextView extends View {
     }
 
     public void undo() {
-        UndoStack.Action action = mUndoStack.undo();
-        if(action != null) {
-            // delete the inserted text
-            if(action.insertText != null)
-                delete(action.insertStart, action.insertEnd, null);
-
-            // insert the deleted text
-            if(action.deleteText != null)
-                insert(action.deleteText, null);
-        }
+        
     }
 
     public void redo() {
-        UndoStack.Action action = mUndoStack.redo();
-        if(action != null) {
-            // delete the deleted text
-            if(action.deleteText != null)
-                delete(action.deleteStart, action.deleteEnd, null);
-
-            // insert the inserted text
-            if(action.insertText != null)
-                insert(action.insertText, null);
-        }
+        
     }
 
     // for find match text
     // set the select handle left and right
-    public void adjustSelectHandle(int start, int end) {
+    public void adjustSelectRange(int start, int end) {
         int left = getLeftSpace();
 
         // select handle left
-        int startLine = mTextBuffer.getOffsetLine(start);
+        int startLine = mGapBuffer.findLineNumber(start);
         int lineStart = getLineStart(startLine);
-        String text = mTextBuffer.getText(lineStart, start);
+        String text = mGapBuffer.substring(lineStart, start);
 
-        selectHandleLeftX = left + getTextMeasureWidth(text);
+        selectHandleLeftX = left + measureText(text);
         selectHandleLeftY = startLine * getLineHeight();
 
         // select handle right
-        int endLine = mTextBuffer.getOffsetLine(end);
+        int endLine = getOffsetLine(end);
         lineStart = getLineStart(endLine);
-        text = mTextBuffer.getText(lineStart, end);
+        text = mGapBuffer.substring(lineStart, end);
 
-        selectHandleRightX = left + getTextMeasureWidth(text);
+        selectHandleRightX = left + measureText(text);
         selectHandleRightY = endLine * getLineHeight();
 
         // set selection
@@ -966,35 +880,25 @@ public class HighlightTextView extends View {
     }
 
     // adjust the cursor coordinate for insert and delete text
-    private void adjustCursorPosition(int index, int line) {
-        mCursorIndex = index;
-        mCursorLine = line;
-
+    private void adjustCursorPosition() {
         // cursor x coordinate
-        int start = getLineStart(line);
+        int start = getLineStart(mCursorLine);
 
-        String text = mTextBuffer.getText(start, index);
-        mCursorPosX = getLeftSpace() + getTextMeasureWidth(text);
+        String text = mGapBuffer.substring(start, mCursorIndex);
+        mCursorPosX = getLeftSpace() + measureText(text);
 
         // cursor y coordinate
-        mCursorPosY = (line - 1) * getLineHeight();
-
-        if(mCursorPosY < getPaddingTop())
-            mCursorPosY = getPaddingTop();
-
-        int bottom = (getLineCount() - 1) * getLineHeight() - getPaddingBottom();
-        if(mCursorPosY > bottom)
-            mCursorPosY = bottom;
+        mCursorPosY = (mCursorLine - 1) * getLineHeight();
     }
 
     // set the cursor position by index
     private void setCursorPosition(int index) {
         // calculate the cursor index and position
         mCursorIndex = index;
-        mCursorLine = mTextBuffer.getOffsetLine(index);
+        mCursorLine = getOffsetLine(index);
 
-        String text = mTextBuffer.getText(getLineStart(mCursorLine), index);
-        int width = getTextMeasureWidth(text);
+        String text = mGapBuffer.substring(getLineStart(mCursorLine), index);
+        int width = measureText(text);
         mCursorPosX = getLeftSpace() + width;
         mCursorPosY = (mCursorLine - 1) * getLineHeight();
     }
@@ -1020,7 +924,7 @@ public class HighlightTextView extends View {
         mCursorLine = mCursorPosY / getLineHeight() + 1;
         mCursorIndex = getLineStart(mCursorLine);
 
-        String text = mTextBuffer.getLine(mCursorLine);
+        String text = mGapBuffer.getLine(mCursorLine);
         int length = text.length();
 
         float[] widths = new float[length];
@@ -1122,18 +1026,18 @@ public class HighlightTextView extends View {
 
         // when on long press to select a word
         private String findNearestWord() {
-            int length = mTextBuffer.getLength();
+            int length = mGapBuffer.length();
 
             // select start index
             for(selectionStart = mCursorIndex; selectionStart >= 0; --selectionStart) {
-                char c = mTextBuffer.getCharAt(selectionStart);
+                char c = mGapBuffer.charAt(selectionStart);
                 if(!Character.isJavaIdentifierPart(c))
                     break;
             }
 
             // select end index
             for(selectionEnd = mCursorIndex; selectionEnd < length; ++selectionEnd) {
-                char c = mTextBuffer.getCharAt(selectionEnd);
+                char c = mGapBuffer.charAt(selectionEnd);
                 if(!Character.isJavaIdentifierPart(c))
                     break;
             }
@@ -1141,7 +1045,7 @@ public class HighlightTextView extends View {
             // select start index needs to be incremented by 1
             ++selectionStart;
             if(selectionStart < selectionEnd) 
-                return mTextBuffer.getText(selectionStart, selectionEnd);
+                return mGapBuffer.substring(selectionStart, selectionEnd);
             return null;
         }
 
@@ -1358,8 +1262,8 @@ public class HighlightTextView extends View {
                     int left = getLeftSpace();
                     int lineStart = getLineStart(mCursorLine);
                     // select handle left (x y)
-                    selectHandleLeftX = left + getTextMeasureWidth(mTextBuffer.getText(lineStart, selectionStart));
-                    selectHandleRightX = left + getTextMeasureWidth(mTextBuffer.getText(lineStart, selectionEnd));
+                    selectHandleLeftX = left + measureText(mGapBuffer.substring(lineStart, selectionStart));
+                    selectHandleRightX = left + measureText(mGapBuffer.substring(lineStart, selectionEnd));
                     selectHandleLeftY = selectHandleRightY = mCursorPosY + getLineHeight();
 
                     // set cursor index and position
@@ -1410,7 +1314,6 @@ public class HighlightTextView extends View {
         }
     }
 
-
     class TextInputConnection extends BaseInputConnection {
 
         public TextInputConnection(View view, boolean fullEditor) {
@@ -1420,7 +1323,7 @@ public class HighlightTextView extends View {
         @Override
         public boolean commitText(CharSequence text, int newCursorPosition) {
             // TODO: Implement this method
-            insert(text, new UndoStack.Action());
+            insert(text.toString());
             return super.commitText(text, newCursorPosition);
         }
 
