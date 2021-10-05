@@ -440,10 +440,9 @@ public class GapBuffer implements CharSequence {
         //TODO handle new size > MAX_INT or allocation failure
         int increasedSize = Math.max(minIncrement, _contents.length * 2 + 2);
         char[] temp = new char[_contents.length + increasedSize];
-        // check the maxiumn length
-        if(temp.length > Integer.MAX_VALUE)
-            throw new OutOfMemoryError();
-            
+        // check the maxiunm size
+        assert temp.length <= Integer.MAX_VALUE;
+        
         int i = 0;
         while (i < _gapStartIndex) {
             temp[i] = _contents[i];
