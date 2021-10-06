@@ -11,10 +11,8 @@ import com.text.edit.BufferCache;
 
 public class GapBuffer implements CharSequence {
 
-    // gap size must be > 0 to insert into full buffers successfully
     private char[] _contents;
     private int _gapStartIndex;
-    /** One past end of gap */
     private int _gapEndIndex;
     private int _lineCount;
     private BufferCache _cache;
