@@ -250,6 +250,8 @@ public class MainActivity extends AppCompatActivity {
         protected Boolean doInBackground(String...params) {
             // TODO: Implement this method
             Path path = Paths.get(params[0]);
+            GapBuffer buffer = mTextView.getBuffer();
+            buffer.delete(0, buffer.length());
             try {
                 // detect the file charset
                 String charset = UniversalDetector.detectCharset(path.toFile());
@@ -259,7 +261,7 @@ public class MainActivity extends AppCompatActivity {
                 BufferedReader br = Files.newBufferedReader(path, mDefaultCharset);
                 String text = null;
                 while((text = br.readLine()) != null) {
-                    mTextView.getBuffer().append(text).append("\n");
+                    buffer.append(text).append("\n");
                 }
                 // close the stream
                 br.close();

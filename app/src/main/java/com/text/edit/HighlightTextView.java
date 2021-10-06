@@ -1239,19 +1239,23 @@ public class HighlightTextView extends View {
         }
  
         public void onUp(MotionEvent e) {
-            // remove auto scroll action
-            removeCallbacks(moveAction);
+            if(touchOnSelectHandleLeft ||
+               touchOnSelectHandleRight ||
+               touchOnSelectHandleMiddle) {
+                // remove auto scroll action
+                removeCallbacks(moveAction);
 
-            touchOnSelectHandleMiddle = false;
-            touchOnSelectHandleLeft = false;
-            touchOnSelectHandleRight = false;
+                touchOnSelectHandleMiddle = false;
+                touchOnSelectHandleLeft = false;
+                touchOnSelectHandleRight = false;
 
-            if(isSelectMode) {
+                if(isSelectMode) {
                 // set cursor index and position at select mode
                 setCursorPosition(selectionEnd);
-            } else {
-                mLastTapTime = System.currentTimeMillis();
-                postDelayed(blinkAction, BLINK_TIMEOUT);
+                } else {
+                    mLastTapTime = System.currentTimeMillis();
+                    postDelayed(blinkAction, BLINK_TIMEOUT);
+                }
             }
         }
     }
