@@ -28,6 +28,7 @@ import android.widget.OverScroller;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Collections;
 
 
 public class HighlightTextView extends View {
@@ -46,7 +47,7 @@ public class HighlightTextView extends View {
     private int mCursorWidth, mCursorHeight;
 
     private int screenWidth, screenHeight;
-    private int lineHeight, spaceWidth;
+    private int lineWidth, spaceWidth;
     private int handleMiddleWidth, handleMiddleHeight;
     private int selectionStart, selectionEnd;
 
@@ -99,6 +100,8 @@ public class HighlightTextView extends View {
     }
 
     private void initView(Context context) {
+        mGapBuffer = new GapBuffer();
+        
         screenWidth = ScreenUtils.getScreenWidth(context);
         screenHeight = ScreenUtils.getScreenHeight(context);
 
@@ -146,10 +149,7 @@ public class HighlightTextView extends View {
         mReplaceList = new ArrayList<>();
 
         mDefaultText = getResources().getString(R.string.default_text);
-        spaceWidth = (int) mTextPaint.measureText(String.valueOf(' '));
-
-        mGapBuffer = new GapBuffer();
-        setDefaultCursorPosition();
+        spaceWidth = (int) mTextPaint.measureText(" ");
 
         requestFocus();
         setFocusable(true);
@@ -185,14 +185,6 @@ public class HighlightTextView extends View {
         invalidate();
     }
 
-    public void setDefaultCursorPosition() {
-        mCursorPosY = 0;
-        mCursorPosX = getLeftSpace();
-        
-        mCursorIndex = 0;
-        mCursorLine = getLineCount();
-    }
-
     // the text size unit is px
     public void setTextSize(float px) {
         // min text size 10dp
@@ -204,19 +196,7 @@ public class HighlightTextView extends View {
         if(px > max) px = max;
 
         mTextPaint.setTextSize(px);
-
-        TextPaint.FontMetricsInt metrics = mTextPaint.getFontMetricsInt();
-        lineHeight = metrics.bottom - metrics.top;
-
-        if(mGapBuffer != null) {
-            // max width line index
-            //int line = mGapBuffer.getWidthList().indexOf(getTextWidth());
-            //mGapBuffer.getWidthList().set(line, getLineWidth(line + 1));
-            adjustCursorPosition();
-            if(isSelectMode)
-                adjustSelectRange(selectionStart, selectionEnd);
-            postInvalidate();
-        }
+        postInvalidate();
     }
 
     public void setEditedMode(boolean editMode) {
@@ -255,12 +235,9 @@ public class HighlightTextView extends View {
         return (int) Math.ceil(mTextPaint.measureText(text));
     }
     
-    private int charWidth(char c) {
-        return measureText(String.valueOf(c));
-    }
-    
     private int getLineHeight() {
-        return lineHeight;
+        TextPaint.FontMetricsInt metrics = mTextPaint.getFontMetricsInt();
+        return metrics.bottom - metrics.top;
     }
 
     private int getLineStart(int lineNumber) {
@@ -275,31 +252,22 @@ public class HighlightTextView extends View {
         return mGapBuffer.getLineCount();
     }
 
-    private int getCharWidth(int index) {
-        return charWidth(mGapBuffer.charAt(index));
-    }
-
     private int getLineNumberWidth() {
         return measureText(Integer.toString(getLineCount()));
     }
 
-    private int getLineWidth(int line) {
-        return measureText(mGapBuffer.getLine(line));
-    }
-
-    // get the max height of text
-    private int getTextHeight() {
-        return getLineCount() * getLineHeight();
+    private int getLineWidth(int lineNumber) {
+        return measureText(mGapBuffer.getLine(lineNumber));
     }
 
     // Get the maximum scrollable width
     public int getMaxScrollX() {
-        return Math.max(0, getLeftSpace() + /*getTextWidth()*/10000 + spaceWidth * 4 - getWidth());
+        return Math.max(0, getLeftSpace() + lineWidth + spaceWidth * 4 - getWidth());
     }
 
     // Get the maximum scrollable height
     public int getMaxScrollY() {
-        return Math.max(0, getTextHeight() + getLineHeight() * 2 - getHeight());
+        return Math.max(0, (getLineCount() + 2) * getLineHeight() - getHeight());
     }
 
     /**
@@ -489,33 +457,35 @@ public class HighlightTextView extends View {
 
     // draw content text
     public void drawEditableText(Canvas canvas) {
-
         int startLine = Math.max(canvas.getClipBounds().top / getLineHeight(), 1);
-
         int endLine = Math.min(canvas.getClipBounds().bottom / getLineHeight() + 1, getLineCount());
 
         // the text line width
-        int lineNumWidth = getLineNumberWidth();
-
+        int lineNumberWidth = getLineNumberWidth();
+        lineWidth = getWidth() - lineNumberWidth;
+        
         // draw text line[start..end]
         for(int i=startLine; i <= endLine; ++i) {
 
-            int textX = getPaddingLeft();
+            int paintX = getPaddingLeft();
             // baseline
-            int textY =  i * getLineHeight() - (int)mTextPaint.descent();
+            int paintY =  i * getLineHeight() - (int)mTextPaint.descent();
 
             // draw line number
             mTextPaint.setColor(Color.GRAY);
-            canvas.drawText(String.valueOf(i), textX, textY, mTextPaint);
+            canvas.drawText(String.valueOf(i), paintX, paintY, mTextPaint);
 
             // draw vertical line
-            canvas.drawLine(lineNumWidth + SPACEING / 2,  (i - 1) * getLineHeight(), lineNumWidth + SPACEING / 2, i * getLineHeight(), mPaint);
+            canvas.drawLine(lineNumberWidth + SPACEING / 2,  (i - 1) * getLineHeight(), lineNumberWidth + SPACEING / 2, i * getLineHeight(), mPaint);
 
             // draw content text
-            textX += (lineNumWidth + SPACEING);
+            paintX += (lineNumberWidth + SPACEING);
             mTextPaint.setColor(Color.BLACK);
 
-            canvas.drawText(mGapBuffer.getLine(i), textX, textY, mTextPaint);
+            String text = mGapBuffer.getLine(i);
+            lineWidth = Math.max(measureText(text), lineWidth);
+            
+            canvas.drawText(text, paintX, paintY, mTextPaint);
         }
     }
 
@@ -696,54 +666,45 @@ public class HighlightTextView extends View {
         }
     }
 
-    private void scrollToFindPos(int curr) {
+    private void scrollToFindPosition(int curr) {
         int first = (Integer)mReplaceList.get(curr).first;
         int second = (Integer)mReplaceList.get(curr).second; 
 
         setCursorPosition(second);
         adjustSelectRange(first, second);
 
-        //mHorizontalScrollView.smoothScrollTo(selectHandleLeftX, mScrollY);
-        //mScrollView.smoothScrollTo(mScrollX, selectHandleLeftY);
+        smoothScrollTo(Math.max(0, selectHandleLeftX - getWidth() / 2),
+                       Math.max(0, selectHandleLeftY - getHeight() / 2));
+        postInvalidate();
     }
 
     // find the current item
     private int current() {
-        for(int i=0; i < mReplaceList.size(); ++i) {
-            int first = (Integer)mReplaceList.get(i).first;
-            int second = (Integer)mReplaceList.get(i).second;
-            if(first == selectionStart && second == selectionEnd)
-                return i;
-        }
         // default return the first item
-        return 0;
+        return Collections.binarySearch(mReplaceList, 
+            new Pair<Integer, Integer>(selectionStart, selectionEnd), 
+            (a, b) -> {
+            int result = (int)a.first - (int)b.first;
+            return result == 0 ? (int)a.second - (int)b.second : result;
+        });
     }
 
-    // find the previous item
     public void prev() {
-        int curr = current();
-        if(curr == 0) {
-            curr = mReplaceList.size() - 1;
-        } else {
-            --curr;
+        int currIndex = current();
+        int prev = --currIndex;
+        if(prev < 0) {
+            prev = mReplaceList.size() - 1;
         }
-
-        scrollToFindPos(curr);
-        postInvalidate();
+        scrollToFindPosition(prev);
     }
 
-    // find the next item
     public void next() {
-        int curr = current();
-        int size = mReplaceList.size();
-        if(curr == size - 1) {
-            curr = 0;
-        } else {
-            ++curr;
+        int currIndex = current();
+        int next = ++currIndex;
+        if(next >= mReplaceList.size()) {
+            next = 0;
         }
-
-        scrollToFindPos(curr);  
-        postInvalidate();
+        scrollToFindPosition(next);
     }
 
     // find text
@@ -965,7 +926,6 @@ public class HighlightTextView extends View {
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
         // TODO: Implement this method
-
         outAttrs.inputType = InputType.TYPE_CLASS_TEXT
             | InputType.TYPE_TEXT_FLAG_MULTI_LINE;
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION
@@ -980,10 +940,10 @@ public class HighlightTextView extends View {
         int dx = 0;
         if(mCursorPosX - getScrollX() <= slopX) {
             // left scroll
-            dx = -getCharWidth(mCursorIndex);
+            dx = -measureText(String.valueOf(mGapBuffer.charAt(mCursorIndex)));
         } else if(mCursorPosX - getScrollX() >= screenWidth - slopX) {
             // right scroll
-            dx = getCharWidth(mCursorIndex + 1);
+            dx = measureText(String.valueOf(mGapBuffer.charAt(mCursorIndex + 1)));
         }   
 
         // when hide soft keyboard
@@ -1051,8 +1011,7 @@ public class HighlightTextView extends View {
 
 
         // swap text select handle left and right
-        private void swapSelection() {
-
+        private void reverse() {
             selectHandleLeftX = selectHandleLeftX ^ selectHandleRightX;
             selectHandleRightX = selectHandleLeftX ^ selectHandleRightX;
             selectHandleLeftX = selectHandleLeftX ^ selectHandleRightX;
@@ -1070,7 +1029,7 @@ public class HighlightTextView extends View {
         }
 
         // when single tap to check the select region
-        private boolean checkSelectRegion(float x, float y) {
+        private boolean checkSelectRange(float x, float y) {
 
             if(y < selectHandleLeftY - getLineHeight() || y > selectHandleRightY)
                 return false;
@@ -1146,7 +1105,7 @@ public class HighlightTextView extends View {
 
             showSoftInput(true);
 
-            if(!isSelectMode || !checkSelectRegion(x, y)) {
+            if(!isSelectMode || !checkSelectRange(x, y)) {
                 // stop cursor blink
                 removeCallbacks(blinkAction);
                 mCursorVisiable = mHandleMiddleVisable = true;
@@ -1222,7 +1181,7 @@ public class HighlightTextView extends View {
                || (selectHandleLeftY == selectHandleRightY 
                && selectHandleLeftX > selectHandleRightX))) {
                 // swap selection handle
-                swapSelection();
+                reverse();
             }
 
             postInvalidate();
@@ -1248,7 +1207,9 @@ public class HighlightTextView extends View {
         public void onLongPress(MotionEvent e) {
             // TODO: Implement this method
             super.onLongPress(e);
-            if(!touchOnSelectHandleMiddle) {
+            removeCallbacks(blinkAction);
+            mCursorVisiable = mHandleMiddleVisable = true;
+            if(!touchOnSelectHandleMiddle && mGapBuffer.length() > 0) {
                 float x = e.getX() + getScrollX();
                 float y = e.getY() + getScrollY();
                 setCursorPosition(x, y);
@@ -1274,27 +1235,21 @@ public class HighlightTextView extends View {
             }
             postInvalidate();
         }
-
-        // 
+ 
         public void onUp(MotionEvent e) {
-            if(touchOnSelectHandleMiddle 
-               || touchOnSelectHandleLeft 
-               || touchOnSelectHandleRight) {
+            // remove auto scroll action
+            removeCallbacks(moveAction);
 
-                // remove auto scroll action
-                removeCallbacks(moveAction);
+            touchOnSelectHandleMiddle = false;
+            touchOnSelectHandleLeft = false;
+            touchOnSelectHandleRight = false;
 
-                touchOnSelectHandleMiddle = false;
-                touchOnSelectHandleLeft = false;
-                touchOnSelectHandleRight = false;
-
-                if(isSelectMode) {
-                    // set cursor index and position at select mode
-                    setCursorPosition(selectionEnd);
-                } else {
-                    mLastTapTime = System.currentTimeMillis();
-                    postDelayed(blinkAction, BLINK_TIMEOUT);
-                }
+            if(isSelectMode) {
+                // set cursor index and position at select mode
+                setCursorPosition(selectionEnd);
+            } else {
+                mLastTapTime = System.currentTimeMillis();
+                postDelayed(blinkAction, BLINK_TIMEOUT);
             }
         }
     }
@@ -1305,11 +1260,8 @@ public class HighlightTextView extends View {
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
             // TODO: Implement this method
-
             float factor = detector.getScaleFactor();
             setTextSize(mTextPaint.getTextSize() * factor);
-
-            //scrollToVisable((int)(detector.getFocusX() * factor), (int)(detector.getFocusY() * factor), mRect);
             return true;
         }
     }
