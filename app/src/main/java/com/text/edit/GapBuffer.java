@@ -289,14 +289,14 @@ public class GapBuffer implements CharSequence {
      *
      * No error checking is done
      */
-    public synchronized GapBuffer insert(int pos, String s/*, long timestamp,
+    public synchronized GapBuffer insert(int offset, String str/*, long timestamp,
                                      boolean undoable*/) {
 //		if (undoable) {
 //			_undoStack.captureInsert(charOffset, c.length, timestamp);
 //		}
 
-        int length = s.length();
-        int insertIndex = getRealIndex(pos);
+        int length = str.length();
+        int insertIndex = getRealIndex(offset);
 
         // shift gap to insertion point
         if (insertIndex != _gapEndIndex) {
@@ -312,7 +312,7 @@ public class GapBuffer implements CharSequence {
         }
 
         for (int i = 0; i < length; ++i) {
-            char c = s.charAt(i);
+            char c = str.charAt(i);
             if (c == NEWLINE) {
                 ++_lineCount;
             }
@@ -320,12 +320,12 @@ public class GapBuffer implements CharSequence {
             ++_gapStartIndex;
         }
 
-        _cache.invalidateCache(pos);
+        _cache.invalidateCache(offset);
         return GapBuffer.this;
     }
 
-    public synchronized GapBuffer append(String s) {
-        insert(length(), s);
+    public synchronized GapBuffer append(String str) {
+        insert(length(), str);
         return GapBuffer.this;
     }
     
@@ -335,13 +335,13 @@ public class GapBuffer implements CharSequence {
      *
      * No error checking is done
      */
-    public synchronized GapBuffer delete(int pos, int len/*, long timestamp,
+    public synchronized GapBuffer delete(int start, int end/*, long timestamp,
                                      boolean undoable*/) {
 //		if (undoable) {
 //			_undoStack.captureDelete(charOffset, totalChars, timestamp);
 //		}
 
-        int newGapStart = pos + len;
+        int newGapStart = end;
 
         // shift gap to deletion point
         if (newGapStart != _gapStartIndex) {
@@ -353,6 +353,7 @@ public class GapBuffer implements CharSequence {
         }
 
         // increase gap size
+        int len = end - start;
         for (int i = 0; i < len; ++i) {
             --_gapStartIndex;
             if (_contents[_gapStartIndex] == NEWLINE) {
@@ -360,10 +361,16 @@ public class GapBuffer implements CharSequence {
             }
         }
 
-        _cache.invalidateCache(pos);
+        _cache.invalidateCache(start);
         return GapBuffer.this;
     }
 
+    public synchronized GapBuffer replace(int start, int end, String str) {
+        delete(start, end);
+        insert(start, str);
+        return GapBuffer.this;
+    }
+    
     /**
      * Gets charCount number of consecutive characters starting from _gapStartIndex.
      *

@@ -114,7 +114,7 @@ public class HighlightTextView extends View {
         // set cursor width
         if(mCursorWidth > 5) mCursorWidth = 5;
 
-        // left water
+        // handle left
         mTextSelectHandleLeftRes = context.getDrawable(R.drawable.abc_text_select_handle_left_mtrl_dark);
         mTextSelectHandleLeftRes.setTint(Color.MAGENTA);
         mTextSelectHandleLeftRes.setColorFilter(Color.MAGENTA, PorterDuff.Mode.SRC_IN);
@@ -122,11 +122,11 @@ public class HighlightTextView extends View {
         selectHandleWidth = mTextSelectHandleLeftRes.getIntrinsicWidth();
         selectHandleHeight = mTextSelectHandleLeftRes.getIntrinsicHeight();
 
-        // right water
+        // handle right
         mTextSelectHandleRightRes = context.getDrawable(R.drawable.abc_text_select_handle_right_mtrl_dark);
         mTextSelectHandleRightRes.setTint(Color.MAGENTA);
 
-        // middle water
+        // handle middle
         mTextSelectHandleMiddleRes = context.getDrawable(R.drawable.abc_text_select_handle_middle_mtrl_dark);
         mTextSelectHandleMiddleRes.setTint(Color.MAGENTA);
         handleMiddleWidth = mTextSelectHandleMiddleRes.getIntrinsicWidth();
@@ -590,6 +590,7 @@ public class HighlightTextView extends View {
     // Insert text
     private void insert(String text) {
         if(!isEditedMode) return; // nothing to do
+        if(isSelectMode) delete();
         
         removeCallbacks(blinkAction);
         mCursorVisiable = true;
@@ -612,24 +613,25 @@ public class HighlightTextView extends View {
     // Delete text
     private void delete() {
         if(!isEditedMode) return; // nothing to do
-
+        if(mCursorIndex <= 0) return;
+        
         removeCallbacks(blinkAction);
         mCursorVisiable = true;
         mHandleMiddleVisable = false;
         
-        int len = 1; // default delete 1 char
         if(isSelectMode) {
-            len = selectionEnd - selectionStart;
-            mGapBuffer.delete(selectionStart, len);
+            isSelectMode = false;
+            mGapBuffer.delete(selectionStart, selectionEnd);
+            mCursorIndex -= selectionEnd - selectionStart;
         } else {
-            mGapBuffer.delete(mCursorIndex - 1, len);
+            mGapBuffer.delete(mCursorIndex - 1, mCursorIndex);
+            mCursorIndex--;
         }
         
         // calculate cursor index and line
-        mCursorIndex -= len;
         mCursorLine = getOffsetLine(mCursorIndex);
-        
         adjustCursorPosition();
+        
         mTextListener.onTextChanged();
 
         scrollToVisable();
@@ -722,24 +724,24 @@ public class HighlightTextView extends View {
     // replace first 
     public void replaceFirst(String replacement) {
         if(!mReplaceList.isEmpty() && isEditedMode) {
-            int start = (Integer) mReplaceList.get(0).first;
-            int end = (Integer) mReplaceList.get(0).second;
-
+            int start = (int)mReplaceList.get(0).first;
+            int end = (int)mReplaceList.get(0).second;
+            
+            mGapBuffer.replace(start, end, replacement);
+            
             int length = replacement.length();
             setCursorPosition(start + length);
             adjustSelectRange(start + length, start + length);
 
-            int delta = start + length - end;
-            //mGapBuffer.replace(start, end, replacement, mCursorLine, delta, this);
-
             // remove the first item
             mReplaceList.remove(0);
-
+            
+            int delta = start + length - end;
             // do not use the find(regex) method to re-find
             // recalculate replace list by index
             for(int i=0;i < mReplaceList.size();++i) {
-                int first = (Integer)mReplaceList.get(i).first + delta;
-                int second = (Integer)mReplaceList.get(i).second + delta;
+                int first = (int) mReplaceList.get(i).first + delta;
+                int second = (int) mReplaceList.get(i).second + delta;
                 mReplaceList.set(i, new Pair<Integer, Integer>(first, second));
             }
         } else {
@@ -1064,7 +1066,7 @@ public class HighlightTextView extends View {
             // TODO: Implement this method
             float x = e.getX() + getScrollX();
             float y = e.getY() + getScrollY();
-            // touch middle water drop
+            // touch handle middle drop
             if(mHandleMiddleVisable && x >= mCursorPosX - handleMiddleWidth / 2 && x <= mCursorPosX + handleMiddleWidth / 2
                && y >= mCursorPosY + getLineHeight() && y <= mCursorPosY + getLineHeight() + handleMiddleHeight) {
 
@@ -1073,7 +1075,7 @@ public class HighlightTextView extends View {
                 mCursorVisiable = mHandleMiddleVisable = true;
             }
 
-            // touch left water drop
+            // touch handle left drop
             if(isSelectMode && x >= selectHandleLeftX - selectHandleWidth + selectHandleWidth / 4 
                && x <= selectHandleLeftX + selectHandleWidth / 4 
                && y >= selectHandleLeftY && y <= selectHandleLeftY + selectHandleHeight) {
@@ -1083,7 +1085,7 @@ public class HighlightTextView extends View {
                 mCursorVisiable = mHandleMiddleVisable = false;
             }
 
-            // touch right water drop
+            // touch handle right drop
             if(isSelectMode && x >= selectHandleRightX - selectHandleWidth / 4 
                && x <= selectHandleRightX + selectHandleWidth - selectHandleWidth / 4 
                && y >= selectHandleRightY && y <= selectHandleRightY + selectHandleHeight) {
