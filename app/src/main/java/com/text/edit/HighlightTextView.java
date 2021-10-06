@@ -101,6 +101,7 @@ public class HighlightTextView extends View {
 
     private void initView(Context context) {
         mGapBuffer = new GapBuffer();
+        mCursorLine = getLineCount();
         
         screenWidth = ScreenUtils.getScreenWidth(context);
         screenHeight = ScreenUtils.getScreenHeight(context);
@@ -196,6 +197,11 @@ public class HighlightTextView extends View {
         if(px > max) px = max;
 
         mTextPaint.setTextSize(px);
+        
+        adjustCursorPosition();
+        if(isSelectMode)
+            adjustSelectRange(selectionStart, selectionEnd);
+            
         postInvalidate();
     }
 
@@ -227,10 +233,6 @@ public class HighlightTextView extends View {
         return getPaddingLeft() + getLineNumberWidth() + SPACEING;
     }
 
-    public int getVisableLine() {
-        return getHeight() / getLineHeight() + 1;
-    }
-
     public int measureText(String text) {
         return (int) Math.ceil(mTextPaint.measureText(text));
     }
@@ -256,8 +258,12 @@ public class HighlightTextView extends View {
         return measureText(Integer.toString(getLineCount()));
     }
 
+    public String getLine(int lineNumber) {
+        return mGapBuffer.getLine(lineNumber);
+    }
+    
     private int getLineWidth(int lineNumber) {
-        return measureText(mGapBuffer.getLine(lineNumber));
+        return measureText(getLine(lineNumber));
     }
 
     // Get the maximum scrollable width
@@ -482,7 +488,7 @@ public class HighlightTextView extends View {
             paintX += (lineNumberWidth + SPACEING);
             mTextPaint.setColor(Color.BLACK);
 
-            String text = mGapBuffer.getLine(i);
+            String text = getLine(i);
             lineWidth = Math.max(measureText(text), lineWidth);
             
             canvas.drawText(text, paintX, paintY, mTextPaint);
@@ -887,7 +893,7 @@ public class HighlightTextView extends View {
         mCursorLine = mCursorPosY / getLineHeight() + 1;
         mCursorIndex = getLineStart(mCursorLine);
 
-        String text = mGapBuffer.getLine(mCursorLine);
+        String text = getLine(mCursorLine);
         int length = text.length();
 
         float[] widths = new float[length];
