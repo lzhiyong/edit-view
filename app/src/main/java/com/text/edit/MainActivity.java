@@ -58,15 +58,6 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    private OnTextChangedListener textListener = new OnTextChangedListener() {
-        @Override
-        public void onTextChanged() {
-            // TODO: Implement this method
-            mHandler.sendEmptyMessage(0);
-            mTextView.postInvalidate();
-        }
-    };
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -81,7 +72,10 @@ public class MainActivity extends AppCompatActivity {
 
         mTextView = findViewById(R.id.mTextView);
         mTextView.setTypeface(Typeface.MONOSPACE);
-        mTextView.setOnTextChangedListener(textListener);
+        mTextView.setOnTextChangedListener(() -> {
+            mHandler.sendEmptyMessage(0);
+            mTextView.postInvalidate();
+        });
 
         mSharedPreference = PreferenceManager.getDefaultSharedPreferences(this);
 
@@ -101,7 +95,6 @@ public class MainActivity extends AppCompatActivity {
         Log.i(TAG, "norHeapSize: " + norHeapSize);
         Log.i(TAG, "maxHeapSize: " + maxHeapSize);
     }
-
 
     public boolean hasPermission(String permission) {
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
