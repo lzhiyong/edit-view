@@ -1,6 +1,5 @@
 package com.text.edit;
 
-import com.text.edit.BufferCache;
 import java.util.LinkedList;
 
 /**
