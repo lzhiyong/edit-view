@@ -555,13 +555,12 @@ public class GapBuffer implements CharSequence {
     }
     
     class UndoStack {
-
         private boolean _isBatchEdit;
-        /** for grouping batch operations */
+        /* for grouping batch operations */
         private int _groupId;
-        /** where new entries should go */
+        /* where new entries should go */
         private int _top;
-        /** timestamp for the previous edit operation */
+        /* timestamp for the previous edit operation */
         private long _lastEditTime;
 
         private LinkedList<Action> _stack = new LinkedList<>();
@@ -617,8 +616,9 @@ public class GapBuffer implements CharSequence {
             return -1;
         }
 
-        //TODO extract common parts of captureInsert and captureDelete
-        /**
+        /** 
+         * extract common parts of captureInsert and captureDelete
+         *
          * Records an insert operation. Should be called before the insertion is
          * actually done.
          */
@@ -721,7 +721,7 @@ public class GapBuffer implements CharSequence {
 
             public abstract void undo();
             public abstract void redo();
-            /** Populates _data with the affected text */
+            /* Populates _data with the affected text */
             public abstract void recordData();
             public abstract int findUndoPosition();
             public abstract int findRedoPosition();
