@@ -3,9 +3,9 @@ package com.text.edit;
 import java.util.LinkedList;
 
 /**
- * GapBuffer is a non-threadsafe EditBuffer that is optimized for editing with a 
- * cursor, which tends to make a sequence of inserts and deletes at the same place
- * in the buffer.
+ * GapBuffer is a threadsafe EditBuffer that is optimized for editing with a cursor
+ * which tends to make a sequence of inserts and deletes at the same place in the buffer
+ *
  * have all methods work with charOffsets and move all gap handling to getRealIndex() 
  */
 
