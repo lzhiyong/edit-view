@@ -133,26 +133,26 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
         // TODO: Implement this method
-        MenuItem itemUndo = menu.findItem(R.id.menu_undo);
-        itemUndo.setIcon(R.drawable.ic_undo_white_24dp);
-        if(mTextView.getUndoStack().canUndo())
-            itemUndo.setEnabled(true);
+        MenuItem undo = menu.findItem(R.id.menu_undo);
+        undo.setIcon(R.drawable.ic_undo_white_24dp);
+        if(mTextView.canUndo())
+            undo.setEnabled(true);
         else
-            itemUndo.setEnabled(false);
+            undo.setEnabled(false);
 
-        MenuItem itemRedo = menu.findItem(R.id.menu_redo);
-        itemRedo.setIcon(R.drawable.ic_redo_white_24dp);
-        if(mTextView.getUndoStack().canRedo())
-            itemRedo.setEnabled(true);
+        MenuItem redo = menu.findItem(R.id.menu_redo);
+        redo.setIcon(R.drawable.ic_redo_white_24dp);
+        if(mTextView.canRedo())
+            redo.setEnabled(true);
         else
-            itemRedo.setEnabled(false);
+            redo.setEnabled(false);
 
-        MenuItem itemEdit = menu.findItem(R.id.menu_edit);
+        MenuItem editMode = menu.findItem(R.id.menu_edit);
 
         if(mTextView.getEditedMode())
-            itemEdit.setIcon(R.drawable.ic_edit_white_24dp);     
+            editMode.setIcon(R.drawable.ic_edit_white_24dp);     
         else
-            itemEdit.setIcon(R.drawable.ic_look_white_24dp);    
+            editMode.setIcon(R.drawable.ic_look_white_24dp);    
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -251,7 +251,7 @@ public class MainActivity extends AppCompatActivity {
             // TODO: Implement this method
             Path path = Paths.get(params[0]);
             GapBuffer buffer = mTextView.getBuffer();
-            buffer.delete(0, buffer.length());
+            buffer.delete(0, buffer.length(), false);
             try {
                 // detect the file charset
                 String charset = UniversalDetector.detectCharset(path.toFile());

@@ -221,14 +221,6 @@ public class HighlightTextView extends View {
         mTextListener = listener;
     }
 
-    public TextPaint getPaint() {
-        return mTextPaint;
-    }
-
-    public UndoStack getUndoStack() {
-        return mUndoStack;
-    }
-
     private int getLeftSpace() {
         return getPaddingLeft() + getLineNumberWidth() + SPACEING;
     }
@@ -596,13 +588,19 @@ public class HighlightTextView extends View {
     // Insert text
     private void insert(String text) {
         if(!isEditedMode) return; // nothing to do
-        if(isSelectMode) delete();
+        if(isSelectMode) {
+            mGapBuffer.beginBatchEdit();
+            delete();
+        } 
         
         removeCallbacks(blinkAction);
         mCursorVisiable = true;
         mHandleMiddleVisable = false;
         
-        mGapBuffer.insert(mCursorIndex, text);
+        mGapBuffer.insert(mCursorIndex, text, true);
+        
+        if(mGapBuffer.isBatchEdit())
+            mGapBuffer.endBatchEdit();
 
         // calculate the cursor index and line
         int length = text.length();
@@ -627,10 +625,10 @@ public class HighlightTextView extends View {
         
         if(isSelectMode) {
             isSelectMode = false;
-            mGapBuffer.delete(selectionStart, selectionEnd);
+            mGapBuffer.delete(selectionStart, selectionEnd, true);
             mCursorIndex -= selectionEnd - selectionStart;
         } else {
-            mGapBuffer.delete(mCursorIndex - 1, mCursorIndex);
+            mGapBuffer.delete(mCursorIndex - 1, mCursorIndex, true);
             mCursorIndex--;
         }
         
@@ -733,7 +731,9 @@ public class HighlightTextView extends View {
             int start = (int)mReplaceList.get(0).first;
             int end = (int)mReplaceList.get(0).second;
             
-            mGapBuffer.replace(start, end, replacement);
+            mGapBuffer.beginBatchEdit();
+            mGapBuffer.replace(start, end, replacement, true);
+            mGapBuffer.endBatchEdit();
             
             int length = replacement.length();
             setCursorPosition(start + length);
@@ -801,11 +801,7 @@ public class HighlightTextView extends View {
 
     // goto line
     public void gotoLine(int line) {
-        if(line < 1) line = 1;
-
-        if(line > getLineCount()) 
-            line = getLineCount();
-            
+        line = Math.min(Math.max(line, 1), getLineCount());
         mCursorIndex = getLineStart(line);
         mCursorLine = line;
         mCursorPosX = getLeftSpace();
@@ -814,12 +810,34 @@ public class HighlightTextView extends View {
         smoothScrollTo(0, Math.max(line * getLineHeight() - getHeight() + getLineHeight() * 2, 0));
     }
 
+    public boolean canUndo() {
+        return mGapBuffer.canUndo();
+    }
+    
+    public boolean canRedo() {
+        return mGapBuffer.canRedo();
+    }
+    
     public void undo() {
-        
+        int index = mGapBuffer.undo();
+        if(index >= 0) {
+            mCursorIndex = index;
+            mCursorLine = getOffsetLine(index);
+            adjustCursorPosition();
+            mTextListener.onTextChanged();
+            scrollToVisable();
+        }
     }
 
     public void redo() {
-        
+        int index = mGapBuffer.redo();
+        if(index >= 0) {
+            mCursorIndex = index;
+            mCursorLine = getOffsetLine(index);
+            adjustCursorPosition();
+            mTextListener.onTextChanged();
+            scrollToVisable();
+        }
     }
 
     // for find match text
