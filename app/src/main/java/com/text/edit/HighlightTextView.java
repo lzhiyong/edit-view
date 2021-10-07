@@ -581,6 +581,9 @@ public class HighlightTextView extends View {
         smoothScrollBy(dx, dy);
     }
 
+    public void onTextChanged() {
+        mTextListener.onTextChanged();
+    }
 
     // Insert text
     private void insert(String text) {
@@ -604,8 +607,8 @@ public class HighlightTextView extends View {
         mCursorIndex += length;
         mCursorLine = getOffsetLine(mCursorIndex);
         adjustCursorPosition();
-        mTextListener.onTextChanged();
-
+        
+        onTextChanged();
         scrollToVisable();
         postInvalidate();
         postDelayed(blinkAction, BLINK_TIMEOUT);
@@ -633,8 +636,7 @@ public class HighlightTextView extends View {
         mCursorLine = getOffsetLine(mCursorIndex);
         adjustCursorPosition();
         
-        mTextListener.onTextChanged();
-
+        onTextChanged();
         scrollToVisable();
         postInvalidate();
         postDelayed(blinkAction, BLINK_TIMEOUT);
@@ -821,7 +823,7 @@ public class HighlightTextView extends View {
             mCursorIndex = index;
             mCursorLine = getOffsetLine(index);
             adjustCursorPosition();
-            mTextListener.onTextChanged();
+            onTextChanged();
             scrollToVisable();
         }
     }
@@ -832,7 +834,7 @@ public class HighlightTextView extends View {
             mCursorIndex = index;
             mCursorLine = getOffsetLine(index);
             adjustCursorPosition();
-            mTextListener.onTextChanged();
+            onTextChanged();
             scrollToVisable();
         }
     }
