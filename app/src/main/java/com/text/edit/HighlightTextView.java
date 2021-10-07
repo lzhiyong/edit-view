@@ -35,6 +35,7 @@ public class HighlightTextView extends View {
 
     private Paint mPaint;
     private TextPaint mTextPaint;
+    private GapBuffer mGapBuffer;
 
     // cursor and select handle drawable resources
     private Drawable mDrawableCursorRes;
@@ -54,9 +55,6 @@ public class HighlightTextView extends View {
     private int selectHandleWidth, selectHandleHeight;
     private int selectHandleLeftX, selectHandleLeftY;
     private int selectHandleRightX, selectHandleRightY;
-
-    private GapBuffer mGapBuffer;
-    private UndoStack mUndoStack;
 
     private OnTextChangedListener mTextListener;
     private OverScroller mScroller;
@@ -146,7 +144,6 @@ public class HighlightTextView extends View {
 
         mScroller = new OverScroller(context);
         mClipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-        mUndoStack = new UndoStack();
         mReplaceList = new ArrayList<>();
 
         mDefaultText = getResources().getString(R.string.default_text);
@@ -1328,3 +1325,4 @@ public class HighlightTextView extends View {
         }
     }
 }
+
